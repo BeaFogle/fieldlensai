@@ -13,6 +13,44 @@
  
 import { useState, useRef } from 'react';
 import { useAIPhotoAnalysis } from '../hooks/useAIPhotoAnalysis';
+
+// ── Resize/compress large phone photos before upload ──────────
+// Phones capture 3–12 MB images. Encoded for the API, that exceeds
+// the serverless request size limit and returns HTTP 413. We downscale
+// a COPY to a max long edge and re-encode as JPEG so uploads stay small
+// and fast. The inspector's workflow is unchanged — they just take a
+// normal photo; the shrinking happens automatically in the background.
+const MAX_EDGE = 1568;       // Anthropic's recommended max long edge
+const JPEG_QUALITY = 0.8;    // good detail, much smaller file
+
+function resizeImageForUpload(file, onDone, onError) {
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > MAX_EDGE || height > MAX_EDGE) {
+        if (width >= height) {
+          height = Math.round(height * (MAX_EDGE / width));
+          width = MAX_EDGE;
+        } else {
+          width = Math.round(width * (MAX_EDGE / height));
+          height = MAX_EDGE;
+        }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      const dataUrl = canvas.toDataURL('image/jpeg', JPEG_QUALITY);
+      onDone({ dataUrl, base64: dataUrl.split(',')[1] });
+    };
+    img.onerror = onError;
+    img.src = ev.target.result;
+  };
+  reader.onerror = onError;
+  reader.readAsDataURL(file);
+}
  
 export default function PhotoAnalysisButton({ sectionKey, inspectorNotes = '', onResult }) {
   const { analyzePhoto, isAnalyzing } = useAIPhotoAnalysis();
@@ -29,18 +67,23 @@ export default function PhotoAnalysisButton({ sectionKey, inspectorNotes = '', o
     const file = e.target.files?.[0];
     if (!file) return;
  
-    const mt = file.type || 'image/jpeg';
-    setMediaType(mt);
+    // media type is set to image/jpeg after resizing (below)
  
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const dataUrl = ev.target.result;
-      setPhotoSrc(dataUrl);
-      // Strip the data:image/...;base64, prefix — API wants raw base64
-      setPhotoBase64(dataUrl.split(',')[1]);
-      setStep('preview');
-    };
-    reader.readAsDataURL(file);
+    // Downscale + compress the photo, then keep the small copy for
+    // both the preview and the AI upload.
+    resizeImageForUpload(
+      file,
+      ({ dataUrl, base64 }) => {
+        setMediaType('image/jpeg');
+        setPhotoSrc(dataUrl);
+        setPhotoBase64(base64);
+        setStep('preview');
+      },
+      (err) => {
+        console.error('Image processing failed:', err);
+        setStep('error');
+      }
+    );
   }
  
   // ── Send to Claude Vision ──────────────────────────────────
