@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PhotoAnalysisButton from './components/PhotoAnalysisButton';
 
 const FL_GREEN = '#0F6E56';
@@ -6,11 +6,49 @@ const FL_GOLD = '#BA7517';
 
 const NOT_INSPECTED_TEXT = 'This area was not inspected. The area was not accessible or could not be visually observed at the time of inspection; therefore, no inspection was performed.';
 
+// Each inspector builds their OWN quick-insert statements. They are saved on
+// this device under this key (will move to the user's account once logins/
+// database are added, so they sync across devices).
+const STATEMENTS_KEY = 'fieldlens_statements';
+
 function App() {
   const [screen, setScreen] = useState('home');
   const [activeSection, setActiveSection] = useState(null);
   const [sectionData, setSectionData] = useState({});
   const [extraRooms, setExtraRooms] = useState([]);
+  const [statements, setStatements] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(STATEMENTS_KEY)) || []; }
+    catch { return []; }
+  });
+  const [showAddStatement, setShowAddStatement] = useState(false);
+  const [newStmtLabel, setNewStmtLabel] = useState('');
+  const [newStmtText, setNewStmtText] = useState('');
+  const [newStmtScope, setNewStmtScope] = useState('section'); // 'section' | 'all'
+
+  useEffect(() => {
+    try { localStorage.setItem(STATEMENTS_KEY, JSON.stringify(statements)); } catch (e) {}
+  }, [statements]);
+
+  function addStatement() {
+    const label = newStmtLabel.trim();
+    const text = newStmtText.trim();
+    if (!label || !text) return;
+    setStatements(prev => [...prev, {
+      id: 'stmt-' + Date.now(),
+      label,
+      text,
+      scope: newStmtScope,
+      sectionKey: activeSection ? activeSection.key : null,
+    }]);
+    setNewStmtLabel('');
+    setNewStmtText('');
+    setNewStmtScope('section');
+    setShowAddStatement(false);
+  }
+
+  function deleteStatement(id) {
+    setStatements(prev => prev.filter(s => s.id !== id));
+  }
 
   const baseSections = [
     { key: 'front-elevation', label: 'Front Elevation', icon: '🏠' },
@@ -94,6 +132,15 @@ function App() {
         ? existing + '\n\n' + NOT_INSPECTED_TEXT
         : NOT_INSPECTED_TEXT;
       return { ...prev, [activeSection.key]: { ...cur, conditionRating: 'Not Inspected', notes } };
+    });
+  }
+
+  function insertStatement(text) {
+    setSectionData(prev => {
+      const cur = prev[activeSection.key] || {};
+      const existing = (cur.notes || '').trim();
+      const notes = existing ? existing + '\n\n' + text : text;
+      return { ...prev, [activeSection.key]: { ...cur, notes } };
     });
   }
 
@@ -215,6 +262,7 @@ function App() {
     const conditions = ['Good', 'Fair', 'Poor', 'Deficient'];
     const condColors = { Good: '#0F6E56', Fair: '#BA7517', Poor: '#854F0B', Deficient: '#A32D2D' };
     const condBg = { Good: '#E1F5EE', Fair: '#FAEEDA', Poor: '#FAEEDA', Deficient: '#FCEBEB' };
+    const applicableStatements = statements.filter(st => st.scope === 'all' || st.sectionKey === activeSection.key);
 
     return (
       <div style={{ minHeight: '100vh', background: '#F5F7F5', fontFamily: 'system-ui, sans-serif' }}>
@@ -259,6 +307,57 @@ function App() {
               placeholder="Type notes or use AI photo analysis below..."
               style={{ width: '100%', minHeight: 80, fontSize: 13, padding: '8px', borderRadius: 8, border: '0.5px solid #E0E0E0', fontFamily: 'inherit', resize: 'none' }}
             />
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 6 }}>My quick statements — tap to insert</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                {applicableStatements.map(st => (
+                  <span key={st.id} style={{ display: 'inline-flex', alignItems: 'center', border: `1px solid ${FL_GREEN}`, borderRadius: 14, overflow: 'hidden' }}>
+                    <button
+                      onClick={() => insertStatement(st.text)}
+                      style={{ fontSize: 12, padding: '6px 4px 6px 10px', background: '#fff', border: 'none', color: FL_GREEN, cursor: 'pointer' }}>
+                      ＋ {st.label}
+                    </button>
+                    <button
+                      onClick={() => deleteStatement(st.id)}
+                      title="Delete this saved statement"
+                      style={{ fontSize: 12, padding: '6px 8px', background: '#fff', border: 'none', borderLeft: `1px solid ${FL_GREEN}`, color: '#A32D2D', cursor: 'pointer' }}>✕</button>
+                  </span>
+                ))}
+                {applicableStatements.length === 0 && (
+                  <span style={{ fontSize: 12, color: '#AAA' }}>No saved statements yet.</span>
+                )}
+                <button
+                  onClick={() => setShowAddStatement(v => !v)}
+                  style={{ fontSize: 12, padding: '6px 10px', borderRadius: 14, border: '1px dashed #999', background: '#fff', color: '#555', cursor: 'pointer' }}>
+                  ＋ Add statement
+                </button>
+              </div>
+
+              {showAddStatement && (
+                <div style={{ marginTop: 8, padding: 10, border: '0.5px solid #E0E0E0', borderRadius: 8, background: '#FAFAFA' }}>
+                  <input
+                    value={newStmtLabel}
+                    onChange={e => setNewStmtLabel(e.target.value)}
+                    placeholder="Short button name (e.g. Slab limitation)"
+                    style={{ width: '100%', fontSize: 13, padding: '8px', borderRadius: 6, border: '0.5px solid #ccc', marginBottom: 6, fontFamily: 'inherit', boxSizing: 'border-box' }}
+                  />
+                  <textarea
+                    value={newStmtText}
+                    onChange={e => setNewStmtText(e.target.value)}
+                    placeholder="Full wording that will be inserted into the notes..."
+                    style={{ width: '100%', minHeight: 70, fontSize: 13, padding: '8px', borderRadius: 6, border: '0.5px solid #ccc', marginBottom: 6, fontFamily: 'inherit', resize: 'none', boxSizing: 'border-box' }}
+                  />
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                    <button onClick={() => setNewStmtScope('section')} style={{ flex: 1, fontSize: 12, padding: '7px', borderRadius: 6, border: `0.5px solid ${newStmtScope === 'section' ? FL_GREEN : '#ccc'}`, background: newStmtScope === 'section' ? '#E1F5EE' : '#fff', color: newStmtScope === 'section' ? FL_GREEN : '#555', cursor: 'pointer' }}>This section only</button>
+                    <button onClick={() => setNewStmtScope('all')} style={{ flex: 1, fontSize: 12, padding: '7px', borderRadius: 6, border: `0.5px solid ${newStmtScope === 'all' ? FL_GREEN : '#ccc'}`, background: newStmtScope === 'all' ? '#E1F5EE' : '#fff', color: newStmtScope === 'all' ? FL_GREEN : '#555', cursor: 'pointer' }}>All sections</button>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={() => setShowAddStatement(false)} style={{ flex: 1, fontSize: 13, padding: '9px', borderRadius: 6, border: '0.5px solid #ccc', background: '#fff', color: '#555', cursor: 'pointer' }}>Cancel</button>
+                    <button onClick={addStatement} style={{ flex: 2, fontSize: 13, fontWeight: 600, padding: '9px', borderRadius: 6, border: 'none', background: FL_GREEN, color: '#fff', cursor: 'pointer' }}>Save statement</button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* AI Photo Analysis */}
