@@ -66,6 +66,23 @@ const SECTION_CONTEXT = {
   'well':             { label: 'Well System', forms: ['Home Inspection'], focus: 'the visible well components: wellhead, pressure tank, pump, and wiring; visible condition only.' },
 };
 
+// Resolve context for a section key, including dynamically added rooms
+// like 'bathroom-2' or 'bedroom-3' (reuse the master room's scope).
+function resolveSectionContext(key) {
+  if (SECTION_CONTEXT[key]) return SECTION_CONTEXT[key];
+  const m = /^(bathroom|bedroom)-(\d+)$/.exec(key || '');
+  if (m) {
+    const n = m[2];
+    if (m[1] === 'bathroom') {
+      return { label: `Bathroom ${n}`, forms: ['Home Inspection'],
+        focus: 'this bathroom: sink/toilet/tub/shower fixtures, plumbing, exhaust ventilation, GFCI outlets, and moisture/mold.' };
+    }
+    return { label: `Bedroom ${n}`, forms: ['Home Inspection'],
+      focus: 'this bedroom and its closet: walls, ceiling, floor, windows, outlets, and smoke detector.' };
+  }
+  return { label: key, forms: ['Home Inspection'] };
+}
+
 // ── System prompt ────────────────────────────────────────────
 // This is what makes Claude respond like a trained inspector,
 // not a generic AI. It knows Florida, it knows the forms,
@@ -112,10 +129,7 @@ export function useAIPhotoAnalysis() {
     setIsAnalyzing(true);
     setError(null);
 
-    const section = SECTION_CONTEXT[sectionKey] || {
-      label: sectionKey,
-      forms: ['Home Inspection'],
-    };
+    const section = resolveSectionContext(sectionKey);
 
     // Build the user prompt with full context
     const userPrompt = `Analyze this inspection photo for the following section:

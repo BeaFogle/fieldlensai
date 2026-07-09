@@ -8,8 +8,9 @@ function App() {
   const [screen, setScreen] = useState('home');
   const [activeSection, setActiveSection] = useState(null);
   const [sectionData, setSectionData] = useState({});
+  const [extraRooms, setExtraRooms] = useState([]);
 
-  const sections = [
+  const baseSections = [
     { key: 'front-elevation', label: 'Front Elevation', icon: '🏠' },
     { key: 'right-elevation', label: 'Right Elevation', icon: '🏠' },
     { key: 'rear-elevation', label: 'Rear Elevation', icon: '🏠' },
@@ -52,6 +53,36 @@ function App() {
     { key: 'septic', label: 'Septic System', icon: '⚙️' },
     { key: 'well', label: 'Well System', icon: '💧' },
   ];
+
+  // User-added bathrooms appear right after the Master Bathroom; added bedrooms
+  // right after the Master Bedroom. Everything else stays in the fixed order.
+  const sections = baseSections.flatMap(s => {
+    if (s.key === 'master-bathroom') return [s, ...extraRooms.filter(r => r.type === 'bathroom')];
+    if (s.key === 'master-bedroom') return [s, ...extraRooms.filter(r => r.type === 'bedroom')];
+    return [s];
+  });
+
+  function addRoom(type) {
+    setExtraRooms(prev => {
+      const n = prev.filter(r => r.type === type).length + 2; // Master counts as #1
+      return [...prev, {
+        key: `${type}-${n}`,
+        label: type === 'bathroom' ? `Bathroom ${n}` : `Bedroom ${n}`,
+        icon: type === 'bathroom' ? '🛁' : '🛏️',
+        type,
+        removable: true,
+      }];
+    });
+  }
+
+  function removeRoom(key) {
+    setExtraRooms(prev => prev.filter(r => r.key !== key));
+    setSectionData(prev => {
+      const copy = { ...prev };
+      delete copy[key];
+      return copy;
+    });
+  }
 
   function handleAIResult(sectionKey, result) {
     setSectionData(prev => ({
@@ -143,11 +174,23 @@ function App() {
                   </div>}
                   {!done && <div style={{ fontSize: 12, color: '#AAA' }}>Tap to inspect</div>}
                 </div>
+                {s.removable && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); removeRoom(s.key); }}
+                    style={{ background: 'none', border: 'none', color: '#A32D2D', fontSize: 16, cursor: 'pointer', padding: '0 6px' }}
+                    title="Remove this room">✕</button>
+                )}
                 {done && <span style={{ fontSize: 18 }}>✓</span>}
                 {!done && <span style={{ fontSize: 16, color: '#CCC' }}>›</span>}
               </div>
             );
           })}
+
+          {/* Add-as-needed rooms */}
+          <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+            <button onClick={() => addRoom('bathroom')} style={{ flex: 1, padding: '12px', background: '#fff', border: `1px dashed ${FL_GREEN}`, borderRadius: 10, color: FL_GREEN, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>＋ Add Bathroom</button>
+            <button onClick={() => addRoom('bedroom')} style={{ flex: 1, padding: '12px', background: '#fff', border: `1px dashed ${FL_GREEN}`, borderRadius: 10, color: FL_GREEN, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>＋ Add Bedroom</button>
+          </div>
         </div>
       </div>
     );
