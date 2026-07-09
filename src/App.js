@@ -4,6 +4,8 @@ import PhotoAnalysisButton from './components/PhotoAnalysisButton';
 const FL_GREEN = '#0F6E56';
 const FL_GOLD = '#BA7517';
 
+const NOT_INSPECTED_TEXT = 'This area was not inspected. The area was not accessible or could not be visually observed at the time of inspection; therefore, no inspection was performed.';
+
 function App() {
   const [screen, setScreen] = useState('home');
   const [activeSection, setActiveSection] = useState(null);
@@ -81,6 +83,17 @@ function App() {
       const copy = { ...prev };
       delete copy[key];
       return copy;
+    });
+  }
+
+  function markNotInspected() {
+    setSectionData(prev => {
+      const cur = prev[activeSection.key] || {};
+      const existing = (cur.notes || '').trim();
+      const notes = existing && existing !== NOT_INSPECTED_TEXT
+        ? existing + '\n\n' + NOT_INSPECTED_TEXT
+        : NOT_INSPECTED_TEXT;
+      return { ...prev, [activeSection.key]: { ...cur, conditionRating: 'Not Inspected', notes } };
     });
   }
 
@@ -230,6 +243,11 @@ function App() {
                 </button>
               ))}
             </div>
+            <button
+              onClick={markNotInspected}
+              style={{ width: '100%', marginTop: 8, padding: '9px 8px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: `0.5px solid ${data.conditionRating === 'Not Inspected' ? '#555' : '#E0E0E0'}`, background: data.conditionRating === 'Not Inspected' ? '#EEEEEE' : '#fff', color: '#555', cursor: 'pointer' }}>
+              ⊘ Not Inspected — auto-fills the standard statement
+            </button>
           </div>
 
           {/* Notes */}
