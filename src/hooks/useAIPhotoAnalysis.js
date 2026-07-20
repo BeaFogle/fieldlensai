@@ -83,6 +83,26 @@ function resolveSectionContext(key) {
   return { label: key, forms: ['Home Inspection'] };
 }
 
+// Sections where a single photo needs context about WHAT it shows, so the AI
+// doesn't misread an intentionally-removed panel cover as a defect. Each type
+// carries guidance injected into the prompt for that specific shot.
+export const PHOTO_TYPES = {
+  'electrical-panel': [
+    { id: 'cover-on', label: 'Cover on', guidance: 'This photo shows the interior panel with its dead-front cover installed. Assess the cover fit, labeling, and enclosure condition.' },
+    { id: 'breakers', label: 'Cover off – breakers', guidance: 'The inspector has INTENTIONALLY removed the dead-front cover to photograph the breakers. Do NOT report the removed/absent cover as a deficiency. Assess the breakers, double-taps, labeling, and any signs of overheating.' },
+    { id: 'wiring', label: 'Cover off – wiring', guidance: 'The inspector has INTENTIONALLY removed the dead-front cover to photograph the wiring and connections. Do NOT report the removed/absent cover as a deficiency. Assess wiring condition, connections, grounding/bonding, and any damage.' },
+  ],
+  'exterior-electrical-panel': [
+    { id: 'cover-on', label: 'Cover on', guidance: 'This photo shows the exterior panel/meter with its cover installed. Assess the enclosure, cover, corrosion, and clearances.' },
+    { id: 'breakers', label: 'Cover off – breakers', guidance: 'The inspector has INTENTIONALLY removed the cover to photograph the breakers/main disconnect. Do NOT report the removed/absent cover as a deficiency. Assess the breakers, disconnect, and any overheating or corrosion.' },
+    { id: 'wiring', label: 'Cover off – wiring', guidance: 'The inspector has INTENTIONALLY removed the cover to photograph the wiring/connections. Do NOT report the removed/absent cover as a deficiency. Assess wiring, connections, grounding/bonding, and corrosion.' },
+  ],
+};
+
+export function getPhotoTypes(sectionKey) {
+  return PHOTO_TYPES[sectionKey] || [];
+}
+
 // ── System prompt ────────────────────────────────────────────
 // This is what makes Claude respond like a trained inspector,
 // not a generic AI. It knows Florida, it knows the forms,
@@ -125,7 +145,7 @@ export function useAIPhotoAnalysis() {
    * @param {string} inspectorNotes - optional notes the inspector already typed
    * @returns {Promise<AnalysisResult>}
    */
-  async function analyzePhoto(base64Image, mediaType, sectionKey, inspectorNotes = '') {
+  async function analyzePhoto(base64Image, mediaType, sectionKey, inspectorNotes = '', photoTypeGuidance = '') {
     setIsAnalyzing(true);
     setError(null);
 
@@ -137,6 +157,7 @@ export function useAIPhotoAnalysis() {
 Section: ${section.label}
 Florida Forms: ${section.forms.join(', ')}
 Assess ONLY: ${section.focus || 'the components that belong to this section; ignore unrelated items visible in the photo'}
+${photoTypeGuidance ? `This specific photo: ${photoTypeGuidance}` : ''}
 ${inspectorNotes ? `Inspector notes already captured: "${inspectorNotes}"` : ''}
 
 Return a JSON object with exactly these 5 fields:

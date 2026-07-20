@@ -12,7 +12,7 @@
 // ============================================================
  
 import { useState, useRef } from 'react';
-import { useAIPhotoAnalysis } from '../hooks/useAIPhotoAnalysis';
+import { useAIPhotoAnalysis, getPhotoTypes } from '../hooks/useAIPhotoAnalysis';
 
 // ── Resize/compress large phone photos before upload ──────────
 // Phones capture 3–12 MB images. Encoded for the API, that exceeds
@@ -60,7 +60,9 @@ export default function PhotoAnalysisButton({ sectionKey, inspectorNotes = '', o
   const [mediaType, setMediaType] = useState('image/jpeg');
   const [aiResult, setAiResult] = useState(null);
   const [editedWriteUp, setEditedWriteUp] = useState('');
+  const [photoType, setPhotoType] = useState(null);
   const fileRef = useRef(null);
+  const photoTypes = getPhotoTypes(sectionKey);
  
   // ── Capture photo from camera or gallery ──────────────────
   function handleFileChange(e) {
@@ -89,7 +91,8 @@ export default function PhotoAnalysisButton({ sectionKey, inspectorNotes = '', o
   // ── Send to Claude Vision ──────────────────────────────────
   async function runAnalysis() {
     setStep('analyzing');
-    const result = await analyzePhoto(photoBase64, mediaType, sectionKey, inspectorNotes);
+    const guidance = (photoTypes.find(t => t.id === photoType) || {}).guidance || '';
+    const result = await analyzePhoto(photoBase64, mediaType, sectionKey, inspectorNotes, guidance);
     if (result.success) {
       setAiResult(result.data);
       setEditedWriteUp(result.data.deficiencyWriteUp);
@@ -117,6 +120,7 @@ export default function PhotoAnalysisButton({ sectionKey, inspectorNotes = '', o
     setPhotoSrc(null);
     setPhotoBase64(null);
     setAiResult(null);
+    setPhotoType(null);
   }
  
   // ── Condition pill color ───────────────────────────────────
@@ -154,6 +158,21 @@ export default function PhotoAnalysisButton({ sectionKey, inspectorNotes = '', o
       {step === 'preview' && (
         <div style={styles.card}>
           <img src={photoSrc} alt="Preview" style={styles.previewImg} />
+          {photoTypes.length > 0 && (
+            <div style={{ margin: '10px 0 4px' }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 6 }}>What does this photo show?</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {photoTypes.map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => setPhotoType(t.id)}
+                    style={{ flex: '1 1 45%', padding: '7px', fontSize: 12, borderRadius: 8, border: `0.5px solid ${photoType === t.id ? '#0F6E56' : '#E0E0E0'}`, background: photoType === t.id ? '#E1F5EE' : '#fff', color: photoType === t.id ? '#0F6E56' : '#555', cursor: 'pointer' }}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div style={styles.btnRow}>
             <button onClick={handleReject} style={styles.btnSecondary}>Retake</button>
             <button onClick={runAnalysis} style={styles.btnPrimary}>Analyze with AI →</button>
