@@ -453,15 +453,26 @@ function App() {
             />
           </div>
 
-          {/* Safety hazard */}
-          {data.safetyHazard && (
+          {/* Safety hazard — inspector can override either way */}
+          {data.safetyHazard ? (
             <div style={{ background: '#FCEBEB', border: '0.5px solid #E24B4A', borderRadius: 10, padding: '12px 14px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 20 }}>⚠️</span>
-              <div>
+              <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#A32D2D' }}>Safety Hazard Flagged</div>
-                <div style={{ fontSize: 12, color: '#A32D2D' }}>This will be highlighted red in the report</div>
+                <div style={{ fontSize: 12, color: '#A32D2D' }}>Highlighted red in the report</div>
               </div>
+              <button
+                onClick={() => setSectionField('safetyHazard', false)}
+                style={{ fontSize: 12, fontWeight: 600, padding: '7px 10px', borderRadius: 8, border: '0.5px solid #A32D2D', background: '#fff', color: '#A32D2D', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                Remove flag
+              </button>
             </div>
+          ) : (
+            <button
+              onClick={() => setSectionField('safetyHazard', true)}
+              style={{ width: '100%', marginBottom: 12, padding: '10px', fontSize: 13, fontWeight: 600, borderRadius: 10, border: '0.5px dashed #E24B4A', background: '#fff', color: '#A32D2D', cursor: 'pointer' }}>
+              ⚠ Flag safety hazard
+            </button>
           )}
 
           {/* Save button */}
