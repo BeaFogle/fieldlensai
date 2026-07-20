@@ -155,6 +155,11 @@ function App() {
     setSectionData(prev => ({ ...prev, [activeSection.key]: { ...prev[activeSection.key], [field]: value } }));
   }
 
+  function setSmokeDetector(value) {
+    const danger = value === 'Present – Not Working' || value === 'Missing';
+    setSectionData(prev => ({ ...prev, [activeSection.key]: { ...prev[activeSection.key], smokeDetector: value, safetyHazard: danger } }));
+  }
+
   function handleAIResult(sectionKey, result) {
     setSectionData(prev => ({
       ...prev,
@@ -346,13 +351,13 @@ function App() {
               {showSmoke && (
                 <div style={{ marginTop: isHVAC ? 12 : 0 }}>
                   <div style={fieldLabelStyle}>Smoke detector</div>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    {['Present', 'Missing', 'N/A'].map(v => {
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {['Present – Working', 'Present – Not Working', 'Missing', 'N/A'].map(v => {
                       const sel = data.smokeDetector === v;
-                      const danger = v === 'Missing';
+                      const danger = v === 'Present – Not Working' || v === 'Missing';
                       return (
-                        <button key={v} onClick={() => setSectionField('smokeDetector', v)}
-                          style={{ flex: 1, padding: '8px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: `0.5px solid ${sel ? (danger ? '#A32D2D' : '#0F6E56') : '#E0E0E0'}`, background: sel ? (danger ? '#FCEBEB' : '#E1F5EE') : '#fff', color: sel ? (danger ? '#A32D2D' : '#0F6E56') : '#888', cursor: 'pointer' }}>
+                        <button key={v} onClick={() => setSmokeDetector(v)}
+                          style={{ flex: '1 1 45%', padding: '8px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: `0.5px solid ${sel ? (danger ? '#A32D2D' : '#0F6E56') : '#E0E0E0'}`, background: sel ? (danger ? '#FCEBEB' : '#E1F5EE') : '#fff', color: sel ? (danger ? '#A32D2D' : '#0F6E56') : '#888', cursor: 'pointer' }}>
                           {v}
                         </button>
                       );
