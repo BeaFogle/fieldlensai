@@ -136,6 +136,12 @@ CRITICAL RULES:
   surroundings, and working clearance. Analyze this photo on its own; do NOT restate or repeat any
   prior findings or notes.
 
+- MATCH CONFIDENCE TO EVIDENCE: State findings with confidence proportional to what is clearly
+  visible. When a condition is ambiguous or cannot be confirmed from the image, use measured
+  language ("appears to", "possible", "consistent with") and recommend evaluation by a licensed
+  professional — do NOT assert a definitive code violation or safety hazard. Reserve definitive
+  violation/hazard wording and specific code citations for conditions that are unambiguous in the photo.
+
 Respond ONLY with a valid JSON object. No preamble, no markdown, no explanation.`;
 
 // ── Main analysis function ───────────────────────────────────

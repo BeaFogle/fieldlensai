@@ -161,18 +161,30 @@ function App() {
   }
 
   function handleAIResult(sectionKey, result) {
-    setSectionData(prev => ({
-      ...prev,
-      [sectionKey]: {
-        ...prev[sectionKey],
-        conditionRating: result.conditionRating,
-        notes: result.deficiencyWriteUp,
-        recommendedAction: result.recommendedAction,
-        safetyHazard: result.safetyHazard,
-        photoSrc: result.photoSrc,
-        aiAnalyzed: true,
-      }
-    }));
+    setSectionData(prev => {
+      const cur = prev[sectionKey] || {};
+      // Keep the most severe condition rating across all photos in this section.
+      const severity = { Good: 1, Fair: 2, Poor: 3, Deficient: 4 };
+      const rating = (severity[result.conditionRating] || 0) >= (severity[cur.conditionRating] || 0)
+        ? result.conditionRating
+        : cur.conditionRating;
+      const existingNotes = (cur.notes || '').trim();
+      return {
+        ...prev,
+        [sectionKey]: {
+          ...cur,
+          conditionRating: rating,
+          // Stack each photo's finding so nothing is lost across multiple photos.
+          notes: existingNotes ? existingNotes + '\n\n' + result.deficiencyWriteUp : result.deficiencyWriteUp,
+          recommendedAction: result.recommendedAction,
+          // Once any photo flags a hazard, the section stays flagged.
+          safetyHazard: cur.safetyHazard || result.safetyHazard,
+          photoSrc: result.photoSrc,
+          photos: [...(cur.photos || []), result.photoSrc],
+          aiAnalyzed: true,
+        }
+      };
+    });
   }
 
   const completedCount = Object.keys(sectionData).length;
