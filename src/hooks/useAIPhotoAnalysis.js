@@ -88,7 +88,7 @@ function resolveSectionContext(key) {
 // carries guidance injected into the prompt for that specific shot.
 export const PHOTO_TYPES = {
   'electrical-panel': [
-    { id: 'cover-on', label: 'Cover on', guidance: 'This photo shows the interior panel with its dead-front cover installed. Assess the cover fit, labeling, and enclosure condition.' },
+    { id: 'cover-on', label: 'Cover on', guidance: 'This photo shows the interior panel with its dead-front cover CLOSED. The interior is NOT visible, so do NOT describe breakers, wiring, connectors, or the circuit directory. Assess only the closed cover, labeling, enclosure condition, and the working clearance in front of the panel.' },
     { id: 'breakers', label: 'Cover off – breakers', guidance: 'The inspector has INTENTIONALLY removed the dead-front cover to photograph the breakers. Do NOT report the removed/absent cover as a deficiency. Assess the breakers, double-taps, labeling, and any signs of overheating.' },
     { id: 'wiring', label: 'Cover off – wiring', guidance: 'The inspector has INTENTIONALLY removed the dead-front cover to photograph the wiring and connections. Do NOT report the removed/absent cover as a deficiency. Assess wiring condition, connections, grounding/bonding, and any damage.' },
   ],
@@ -129,6 +129,12 @@ CRITICAL RULES:
 - Standard inspection practices are NOT deficiencies. For example, if an electrical panel's
   dead-front cover has been removed by the inspector to photograph the breakers or wiring, do NOT
   report the missing/removed cover as a defect — evaluate the components shown instead.
+- ONLY WHAT IS VISIBLE: Report only conditions that are directly visible in THIS photograph. Never
+  infer, assume, or describe components that are hidden, behind a closed cover/door/panel, or simply
+  not shown. If an electrical panel's dead-front cover is CLOSED, do NOT describe breakers, wiring,
+  connectors, or the circuit directory — comment only on the closed cover, labeling, enclosure,
+  surroundings, and working clearance. Analyze this photo on its own; do NOT restate or repeat any
+  prior findings or notes.
 
 Respond ONLY with a valid JSON object. No preamble, no markdown, no explanation.`;
 

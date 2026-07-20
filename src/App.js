@@ -436,7 +436,7 @@ function App() {
             <div style={{ fontSize: 12, color: '#AAA', marginBottom: 8 }}>Take a photo — Claude Vision writes the finding for you</div>
             <PhotoAnalysisButton
               sectionKey={activeSection.key}
-              inspectorNotes={data.notes || ''}
+              inspectorNotes=""
               onResult={(result) => handleAIResult(activeSection.key, result)}
             />
           </div>
