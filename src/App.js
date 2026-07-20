@@ -11,6 +11,13 @@ const NOT_INSPECTED_TEXT = 'This area was not inspected. The area was not access
 // database are added, so they sync across devices).
 const STATEMENTS_KEY = 'fieldlens_statements';
 
+// Sections that get a smoke-detector check (living spaces). Dynamically-added
+// bedrooms (bedroom-2, bedroom-3, ...) are matched by pattern below.
+const LIVING_SPACE_KEYS = ['master-bedroom', 'living-room', 'family-room', 'game-room', 'dining-room', 'office', 'hallways'];
+function isLivingSpace(key) {
+  return LIVING_SPACE_KEYS.includes(key) || /^bedroom-\d+$/.test(key || '');
+}
+
 function App() {
   const [screen, setScreen] = useState('home');
   const [activeSection, setActiveSection] = useState(null);
@@ -144,6 +151,10 @@ function App() {
     });
   }
 
+  function setSectionField(field, value) {
+    setSectionData(prev => ({ ...prev, [activeSection.key]: { ...prev[activeSection.key], [field]: value } }));
+  }
+
   function handleAIResult(sectionKey, result) {
     setSectionData(prev => ({
       ...prev,
@@ -263,6 +274,15 @@ function App() {
     const condColors = { Good: '#0F6E56', Fair: '#BA7517', Poor: '#854F0B', Deficient: '#A32D2D' };
     const condBg = { Good: '#E1F5EE', Fair: '#FAEEDA', Poor: '#FAEEDA', Deficient: '#FCEBEB' };
     const applicableStatements = statements.filter(st => st.scope === 'all' || st.sectionKey === activeSection.key);
+    const isHVAC = activeSection.key === 'hvac';
+    const showSmoke = isLivingSpace(activeSection.key);
+    const returnT = parseFloat(data.returnTemp);
+    const supplyT = parseFloat(data.supplyTemp);
+    const hasTemps = !isNaN(returnT) && !isNaN(supplyT);
+    const tempDiff = hasTemps ? Math.round((returnT - supplyT) * 10) / 10 : null;
+    const tempDiffOk = tempDiff !== null && tempDiff >= 14 && tempDiff <= 22;
+    const fieldLabelStyle = { fontSize: 10, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 };
+    const numInputStyle = { width: '100%', fontSize: 14, padding: '8px', borderRadius: 6, border: '0.5px solid #ccc', fontFamily: 'inherit', boxSizing: 'border-box' };
 
     return (
       <div style={{ minHeight: '100vh', background: '#F5F7F5', fontFamily: 'system-ui, sans-serif' }}>
@@ -297,6 +317,51 @@ function App() {
               ⊘ Not Inspected — auto-fills the standard statement
             </button>
           </div>
+
+          {/* Section-specific details */}
+          {(isHVAC || showSmoke) && (
+            <div style={{ background: '#fff', borderRadius: 10, padding: '14px', marginBottom: 12 }}>
+              <div style={{ fontSize: 11, fontWeight: 500, color: '#888', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 10 }}>Section Details</div>
+
+              {isHVAC && (
+                <div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={fieldLabelStyle}>Return air °F</div>
+                      <input type="number" inputMode="decimal" value={data.returnTemp || ''} onChange={e => setSectionField('returnTemp', e.target.value)} style={numInputStyle} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={fieldLabelStyle}>Supply air °F</div>
+                      <input type="number" inputMode="decimal" value={data.supplyTemp || ''} onChange={e => setSectionField('supplyTemp', e.target.value)} style={numInputStyle} />
+                    </div>
+                  </div>
+                  {hasTemps && (
+                    <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: tempDiffOk ? '#E1F5EE' : '#FCEBEB', color: tempDiffOk ? '#0F6E56' : '#A32D2D', fontSize: 13, fontWeight: 600 }}>
+                      Temperature differential: {tempDiff}°F — {tempDiffOk ? 'within normal range (14–22°F)' : 'outside normal range (14–22°F); verify system operation'}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {showSmoke && (
+                <div style={{ marginTop: isHVAC ? 12 : 0 }}>
+                  <div style={fieldLabelStyle}>Smoke detector</div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {['Present', 'Missing', 'N/A'].map(v => {
+                      const sel = data.smokeDetector === v;
+                      const danger = v === 'Missing';
+                      return (
+                        <button key={v} onClick={() => setSectionField('smokeDetector', v)}
+                          style={{ flex: 1, padding: '8px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: `0.5px solid ${sel ? (danger ? '#A32D2D' : '#0F6E56') : '#E0E0E0'}`, background: sel ? (danger ? '#FCEBEB' : '#E1F5EE') : '#fff', color: sel ? (danger ? '#A32D2D' : '#0F6E56') : '#888', cursor: 'pointer' }}>
+                          {v}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Notes */}
           <div style={{ background: '#fff', borderRadius: 10, padding: '14px', marginBottom: 12 }}>
