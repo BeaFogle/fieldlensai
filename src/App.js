@@ -10,6 +10,7 @@ const NOT_INSPECTED_TEXT = 'This area was not inspected. The area was not access
 // this device under this key (will move to the user's account once logins/
 // database are added, so they sync across devices).
 const STATEMENTS_KEY = 'fieldlens_statements';
+const REPORT_KEY = 'fieldlens_report_info';
 
 // Sections that get a smoke-detector check (living spaces). Dynamically-added
 // bedrooms (bedroom-2, bedroom-3, ...) are matched by pattern below.
@@ -31,10 +32,22 @@ function App() {
   const [newStmtLabel, setNewStmtLabel] = useState('');
   const [newStmtText, setNewStmtText] = useState('');
   const [newStmtScope, setNewStmtScope] = useState('section'); // 'section' | 'all'
+  const [reportInfo, setReportInfo] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(REPORT_KEY)) || {}; }
+    catch { return {}; }
+  });
 
   useEffect(() => {
     try { localStorage.setItem(STATEMENTS_KEY, JSON.stringify(statements)); } catch (e) {}
   }, [statements]);
+
+  useEffect(() => {
+    try { localStorage.setItem(REPORT_KEY, JSON.stringify(reportInfo)); } catch (e) {}
+  }, [reportInfo]);
+
+  function updateReportInfo(field, value) {
+    setReportInfo(prev => ({ ...prev, [field]: value }));
+  }
 
   function addStatement() {
     const label = newStmtLabel.trim();
@@ -234,11 +247,20 @@ function App() {
         </div>
 
         {/* Start button */}
-        <div style={{ padding: '16px' }}>
+        <div style={{ padding: '16px 16px 8px' }}>
           <button
             onClick={() => setScreen('sections')}
             style={{ width: '100%', padding: '16px', background: FL_GREEN, color: '#fff', border: 'none', borderRadius: 12, fontSize: 16, fontWeight: 600, cursor: 'pointer' }}>
             Start New Inspection →
+          </button>
+        </div>
+
+        {/* Generate report button */}
+        <div style={{ padding: '0 16px 8px' }}>
+          <button
+            onClick={() => setScreen('report')}
+            style={{ width: '100%', padding: '14px', background: '#fff', color: FL_GREEN, border: `1.5px solid ${FL_GREEN}`, borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>
+            📄 Generate Report
           </button>
         </div>
 
@@ -481,6 +503,119 @@ function App() {
             style={{ width: '100%', padding: '14px', background: FL_GREEN, color: '#fff', border: 'none', borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>
             Save & Return to Sections
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── REPORT SCREEN ────────────────────────────────────────
+  if (screen === 'report') {
+    const doneSections = sections.filter(s => sectionData[s.key]);
+    const hazards = sections.filter(s => sectionData[s.key]?.safetyHazard);
+    const detailFields = [
+      ['companyName', 'Company name'],
+      ['license', 'License #'],
+      ['inspectorName', 'Inspector name'],
+      ['clientName', 'Client name'],
+      ['propertyAddress', 'Property address'],
+      ['inspectionDate', 'Inspection date'],
+    ];
+    return (
+      <div style={{ minHeight: '100vh', background: '#fff', fontFamily: 'system-ui, sans-serif' }}>
+        <style>{`@media print { .no-print { display: none !important; } .report-page { padding: 0 !important; max-width: none !important; } }`}</style>
+
+        {/* Toolbar */}
+        <div className="no-print" style={{ position: 'sticky', top: 0, background: FL_GREEN, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, zIndex: 10 }}>
+          <button onClick={() => setScreen('home')} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 20, cursor: 'pointer' }}>←</button>
+          <div style={{ flex: 1, color: '#fff', fontWeight: 600 }}>Inspection Report</div>
+          <button onClick={() => window.print()} style={{ padding: '8px 14px', background: '#fff', color: FL_GREEN, border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>Save as PDF</button>
+        </div>
+
+        {/* Report details form */}
+        <div className="no-print" style={{ padding: 16, background: '#F5F7F5', borderBottom: '1px solid #E0E0E0' }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 8 }}>Report Details</div>
+          {detailFields.map(([f, label]) => (
+            <input
+              key={f}
+              value={reportInfo[f] || ''}
+              onChange={e => updateReportInfo(f, e.target.value)}
+              placeholder={label}
+              style={{ width: '100%', fontSize: 13, padding: '9px', borderRadius: 6, border: '0.5px solid #ccc', marginBottom: 6, boxSizing: 'border-box', fontFamily: 'inherit' }}
+            />
+          ))}
+          <div style={{ fontSize: 11, color: '#AAA' }}>Company details save automatically. Tap "Save as PDF" to print or save the report.</div>
+        </div>
+
+        {/* Printable report body */}
+        <div className="report-page" style={{ padding: 24, maxWidth: 800, margin: '0 auto' }}>
+          <div style={{ borderBottom: `3px solid ${FL_GREEN}`, paddingBottom: 12, marginBottom: 16 }}>
+            <div style={{ fontSize: 22, fontWeight: 700, color: FL_GREEN }}>{reportInfo.companyName || 'Inspection Report'}</div>
+            <div style={{ fontSize: 12, color: '#555' }}>
+              {reportInfo.inspectorName ? reportInfo.inspectorName : ''}{reportInfo.license ? ` · Lic. ${reportInfo.license}` : ''}
+            </div>
+            <div style={{ fontSize: 13, marginTop: 8, color: '#222' }}>
+              {reportInfo.propertyAddress && <div><strong>Property:</strong> {reportInfo.propertyAddress}</div>}
+              {reportInfo.clientName && <div><strong>Client:</strong> {reportInfo.clientName}</div>}
+              {reportInfo.inspectionDate && <div><strong>Date:</strong> {reportInfo.inspectionDate}</div>}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
+            <div style={{ flex: 1, textAlign: 'center', padding: 10, background: '#F5F7F5', borderRadius: 8 }}>
+              <div style={{ fontSize: 20, fontWeight: 700, color: FL_GREEN }}>{doneSections.length}</div>
+              <div style={{ fontSize: 11, color: '#888' }}>Sections inspected</div>
+            </div>
+            <div style={{ flex: 1, textAlign: 'center', padding: 10, background: '#F5F7F5', borderRadius: 8 }}>
+              <div style={{ fontSize: 20, fontWeight: 700, color: hazards.length ? '#E24B4A' : FL_GREEN }}>{hazards.length}</div>
+              <div style={{ fontSize: 11, color: '#888' }}>Safety hazards</div>
+            </div>
+          </div>
+
+          {hazards.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#A32D2D', marginBottom: 6 }}>⚠ Safety Hazard Summary</div>
+              {hazards.map(s => (
+                <div key={s.key} style={{ fontSize: 13, color: '#A32D2D' }}>• {s.label}</div>
+              ))}
+            </div>
+          )}
+
+          {doneSections.length === 0 && (
+            <div style={{ color: '#888', fontSize: 14 }}>No sections inspected yet. Go back, complete some sections, then return here to generate the report.</div>
+          )}
+
+          {doneSections.map(s => {
+            const d = sectionData[s.key];
+            return (
+              <div key={s.key} style={{ marginBottom: 18, breakInside: 'avoid' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E0E0E0', paddingBottom: 4, marginBottom: 6 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: '#1A1A1A' }}>{s.icon} {s.label}</div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {d.conditionRating && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10, background: '#F5F7F5', color: '#333' }}>{d.conditionRating}</span>}
+                    {d.safetyHazard && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10, background: '#FCEBEB', color: '#A32D2D' }}>⚠ Safety hazard</span>}
+                  </div>
+                </div>
+                {(d.returnTemp || d.supplyTemp) && (
+                  <div style={{ fontSize: 12, color: '#555', marginBottom: 4 }}>
+                    Return: {d.returnTemp || '—'}°F · Supply: {d.supplyTemp || '—'}°F{d.returnTemp && d.supplyTemp ? ` · Differential ${Math.round((parseFloat(d.returnTemp) - parseFloat(d.supplyTemp)) * 10) / 10}°F` : ''}
+                  </div>
+                )}
+                {d.smokeDetector && <div style={{ fontSize: 12, color: (d.smokeDetector === 'Missing' || d.smokeDetector === 'Present – Not Working') ? '#A32D2D' : '#555', marginBottom: 4 }}>Smoke detector: {d.smokeDetector}</div>}
+                {d.notes && <div style={{ fontSize: 13, color: '#222', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{d.notes}</div>}
+                {d.photos && d.photos.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                    {d.photos.map((p, i) => (
+                      <img key={i} src={p} alt="" style={{ width: 160, height: 120, objectFit: 'cover', borderRadius: 6, border: '1px solid #E0E0E0' }} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          <div style={{ marginTop: 24, paddingTop: 12, borderTop: '1px solid #E0E0E0', fontSize: 11, color: '#888', lineHeight: 1.5 }}>
+            This report was prepared by {reportInfo.companyName || '[Company]'} and reflects visible, readily accessible conditions observed at the time of inspection in accordance with the applicable Standards of Practice. It is not a warranty or guarantee of any kind.
+          </div>
         </div>
       </div>
     );
