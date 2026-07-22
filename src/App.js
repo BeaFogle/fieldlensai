@@ -91,6 +91,30 @@ function App() {
     setReportInfo(prev => ({ ...prev, [field]: value }));
   }
 
+  function updateAttendee(i, value) {
+    setSavedFlash(false);
+    setReportInfo(prev => {
+      const list = Array.isArray(prev.attendees) && prev.attendees.length ? [...prev.attendees] : [''];
+      list[i] = value;
+      return { ...prev, attendees: list };
+    });
+  }
+
+  function addAttendee() {
+    setReportInfo(prev => {
+      const list = Array.isArray(prev.attendees) && prev.attendees.length ? [...prev.attendees] : [''];
+      return { ...prev, attendees: [...list, ''] };
+    });
+  }
+
+  function removeAttendee(i) {
+    setReportInfo(prev => {
+      const list = Array.isArray(prev.attendees) ? [...prev.attendees] : [];
+      list.splice(i, 1);
+      return { ...prev, attendees: list.length ? list : [''] };
+    });
+  }
+
   function handleCoverPhoto(e) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -338,6 +362,7 @@ function App() {
       ['propertyAddress', 'Property address'],
       ['inspectionDate', 'Inspection date (mm/dd/yyyy)'],
     ];
+    const attendees = Array.isArray(reportInfo.attendees) && reportInfo.attendees.length ? reportInfo.attendees : [''];
     return (
       <div style={{ minHeight: '100vh', background: '#F5F7F5', fontFamily: 'system-ui, sans-serif' }}>
         <div style={{ background: FL_GREEN, padding: '14px 16px', color: '#fff', display: 'flex', alignItems: 'center', gap: 12, position: 'sticky', top: 0, zIndex: 10 }}>
@@ -356,6 +381,24 @@ function App() {
               style={{ width: '100%', fontSize: 14, padding: '11px', borderRadius: 8, border: '0.5px solid #ccc', marginBottom: 8, boxSizing: 'border-box', fontFamily: 'inherit' }}
             />
           ))}
+
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 6 }}>Present During Inspection</div>
+            {attendees.map((name, i) => (
+              <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                <input
+                  value={name}
+                  onChange={e => updateAttendee(i, e.target.value)}
+                  placeholder="Name and role (e.g. John Smith – buyer's agent)"
+                  style={{ flex: 1, fontSize: 14, padding: '11px', borderRadius: 8, border: '0.5px solid #ccc', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                />
+                {attendees.length > 1 && (
+                  <button onClick={() => removeAttendee(i)} title="Remove this person" style={{ padding: '0 12px', fontSize: 15, borderRadius: 8, border: '1px solid #A32D2D', background: '#fff', color: '#A32D2D', cursor: 'pointer' }}>✕</button>
+                )}
+              </div>
+            ))}
+            <button onClick={addAttendee} style={{ padding: '9px 14px', fontSize: 13, fontWeight: 600, borderRadius: 8, border: `1px dashed ${FL_GREEN}`, background: '#fff', color: FL_GREEN, cursor: 'pointer' }}>＋ Add another person</button>
+          </div>
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 6 }}>Front of House Photo</div>
             {reportInfo.coverPhoto ? (
@@ -661,6 +704,7 @@ function App() {
   if (screen === 'report') {
     const doneSections = sections.filter(s => sectionData[s.key]);
     const hazards = sections.filter(s => sectionData[s.key]?.safetyHazard);
+    const attendeeList = (reportInfo.attendees || []).filter(a => a && a.trim());
     const frontElev = sectionData['front-elevation'];
     const coverPhoto = reportInfo.coverPhoto || (frontElev && frontElev.photos && frontElev.photos[0]) || '';
     const detailFields = [
@@ -713,6 +757,7 @@ function App() {
               {reportInfo.propertyAddress && <div><strong>Property:</strong> {reportInfo.propertyAddress}</div>}
               {reportInfo.clientName && <div><strong>Client:</strong> {reportInfo.clientName}</div>}
               {reportInfo.inspectionDate && <div><strong>Date:</strong> {reportInfo.inspectionDate}</div>}
+              {attendeeList.length > 0 && <div><strong>Present at inspection:</strong> {attendeeList.join('; ')}</div>}
             </div>
           </div>
 
