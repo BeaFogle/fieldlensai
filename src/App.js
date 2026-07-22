@@ -16,6 +16,14 @@ const EXTRAROOMS_KEY = 'fieldlens_extra_rooms';
 
 // Sections that get a smoke-detector check (living spaces). Dynamically-added
 // bedrooms (bedroom-2, bedroom-3, ...) are matched by pattern below.
+// Finding flags an inspector can toggle on any section.
+const FLAG_TYPES = [
+  { key: 'safetyHazard', label: 'Safety Hazard', icon: '⚠', color: '#A32D2D', bg: '#FCEBEB' },
+  { key: 'maintenance', label: 'Maintenance Needed', icon: '🔧', color: '#BA7517', bg: '#FAEEDA' },
+  { key: 'cosmetic', label: 'Cosmetic', icon: '🎨', color: '#185FA5', bg: '#E6F1FB' },
+  { key: 'recommendation', label: 'Recommendation', icon: '💡', color: '#0F6E56', bg: '#E1F5EE' },
+];
+
 const LIVING_SPACE_KEYS = ['master-bedroom', 'living-room', 'family-room', 'game-room', 'dining-room', 'office', 'hallways'];
 function isLivingSpace(key) {
   return LIVING_SPACE_KEYS.includes(key) || /^bedroom-\d+$/.test(key || '');
@@ -583,27 +591,26 @@ function App() {
             </div>
           )}
 
-          {/* Safety hazard — inspector can override either way */}
-          {data.safetyHazard ? (
-            <div style={{ background: '#FCEBEB', border: '0.5px solid #E24B4A', borderRadius: 10, padding: '12px 14px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 20 }}>⚠️</span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#A32D2D' }}>Safety Hazard Flagged</div>
-                <div style={{ fontSize: 12, color: '#A32D2D' }}>Highlighted red in the report</div>
-              </div>
-              <button
-                onClick={() => setSectionField('safetyHazard', false)}
-                style={{ fontSize: 12, fontWeight: 600, padding: '7px 10px', borderRadius: 8, border: '0.5px solid #A32D2D', background: '#fff', color: '#A32D2D', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                Remove flag
-              </button>
+          {/* Finding flags — tap to toggle; inspector always has final say */}
+          <div style={{ background: '#fff', borderRadius: 10, padding: '14px', marginBottom: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 500, color: '#888', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 8 }}>Flags</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {FLAG_TYPES.map(fl => {
+                const on = !!data[fl.key];
+                return (
+                  <button
+                    key={fl.key}
+                    onClick={() => setSectionField(fl.key, !on)}
+                    style={{ flex: '1 1 45%', padding: '9px 6px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: `0.5px solid ${on ? fl.color : '#E0E0E0'}`, background: on ? fl.bg : '#fff', color: on ? fl.color : '#888', cursor: 'pointer' }}>
+                    {fl.icon} {fl.label}
+                  </button>
+                );
+              })}
             </div>
-          ) : (
-            <button
-              onClick={() => setSectionField('safetyHazard', true)}
-              style={{ width: '100%', marginBottom: 12, padding: '10px', fontSize: 13, fontWeight: 600, borderRadius: 10, border: '0.5px dashed #E24B4A', background: '#fff', color: '#A32D2D', cursor: 'pointer' }}>
-              ⚠ Flag safety hazard
-            </button>
-          )}
+            {data.safetyHazard && (
+              <div style={{ marginTop: 8, fontSize: 12, color: '#A32D2D', fontWeight: 600 }}>⚠ Safety hazard — highlighted red in the report. Tap again to remove.</div>
+            )}
+          </div>
 
           {/* Save button */}
           <button
@@ -690,12 +697,21 @@ function App() {
             </div>
           </div>
 
-          {hazards.length > 0 && (
+          {FLAG_TYPES.some(fl => sections.some(s => sectionData[s.key]?.[fl.key])) && (
             <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#A32D2D', marginBottom: 6 }}>⚠ Safety Hazard Summary</div>
-              {hazards.map(s => (
-                <div key={s.key} style={{ fontSize: 13, color: '#A32D2D' }}>• {s.label}</div>
-              ))}
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#1A1A1A', marginBottom: 8 }}>Findings Summary</div>
+              {FLAG_TYPES.map(fl => {
+                const list = sections.filter(s => sectionData[s.key]?.[fl.key]);
+                if (list.length === 0) return null;
+                return (
+                  <div key={fl.key} style={{ marginBottom: 10, breakInside: 'avoid' }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: fl.color, marginBottom: 3 }}>{fl.icon} {fl.label} ({list.length})</div>
+                    {list.map(s => (
+                      <div key={s.key} style={{ fontSize: 13, color: fl.color }}>• {s.label}</div>
+                    ))}
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -711,7 +727,9 @@ function App() {
                   <div style={{ fontSize: 15, fontWeight: 700, color: '#1A1A1A' }}>{s.icon} {s.label}</div>
                   <div style={{ display: 'flex', gap: 6 }}>
                     {d.conditionRating && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10, background: '#F5F7F5', color: '#333' }}>{d.conditionRating}</span>}
-                    {d.safetyHazard && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10, background: '#FCEBEB', color: '#A32D2D' }}>⚠ Safety hazard</span>}
+                    {FLAG_TYPES.filter(fl => d[fl.key]).map(fl => (
+                      <span key={fl.key} style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10, background: fl.bg, color: fl.color }}>{fl.icon} {fl.label}</span>
+                    ))}
                   </div>
                 </div>
                 {(d.returnTemp || d.supplyTemp) && (
