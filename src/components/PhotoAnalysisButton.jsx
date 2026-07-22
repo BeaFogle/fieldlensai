@@ -23,7 +23,7 @@ import { useAIPhotoAnalysis, getPhotoTypes } from '../hooks/useAIPhotoAnalysis';
 const MAX_EDGE = 1568;       // Anthropic's recommended max long edge
 const JPEG_QUALITY = 0.8;    // good detail, much smaller file
 
-function resizeImageForUpload(file, onDone, onError) {
+export function resizeImageForUpload(file, onDone, onError) {
   const reader = new FileReader();
   reader.onload = (ev) => {
     const img = new Image();

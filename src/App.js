@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import PhotoAnalysisButton from './components/PhotoAnalysisButton';
+import { useState, useEffect, useRef } from 'react';
+import PhotoAnalysisButton, { resizeImageForUpload } from './components/PhotoAnalysisButton';
 
 const FL_GREEN = '#0F6E56';
 const FL_GOLD = '#BA7517';
@@ -42,6 +42,7 @@ function App() {
   });
   const [viewPhoto, setViewPhoto] = useState(null);
   const [savedFlash, setSavedFlash] = useState(false);
+  const coverRef = useRef(null);
   const [statements, setStatements] = useState(() => {
     try { return JSON.parse(localStorage.getItem(STATEMENTS_KEY)) || []; }
     catch { return []; }
@@ -88,6 +89,16 @@ function App() {
   function updateReportInfo(field, value) {
     setSavedFlash(false);
     setReportInfo(prev => ({ ...prev, [field]: value }));
+  }
+
+  function handleCoverPhoto(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    resizeImageForUpload(
+      file,
+      ({ dataUrl }) => updateReportInfo('coverPhoto', dataUrl),
+      (err) => console.error('Cover photo failed:', err)
+    );
   }
 
   function addStatement() {
@@ -345,6 +356,23 @@ function App() {
               style={{ width: '100%', fontSize: 14, padding: '11px', borderRadius: 8, border: '0.5px solid #ccc', marginBottom: 8, boxSizing: 'border-box', fontFamily: 'inherit' }}
             />
           ))}
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 6 }}>Front of House Photo</div>
+            {reportInfo.coverPhoto ? (
+              <div>
+                <img src={reportInfo.coverPhoto} alt="Front of house" style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 8, border: '1px solid #E0E0E0', display: 'block', marginBottom: 6 }} />
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => coverRef.current?.click()} style={{ flex: 1, padding: '9px', fontSize: 13, fontWeight: 600, borderRadius: 8, border: `1px solid ${FL_GREEN}`, background: '#fff', color: FL_GREEN, cursor: 'pointer' }}>Replace photo</button>
+                  <button onClick={() => updateReportInfo('coverPhoto', '')} style={{ flex: 1, padding: '9px', fontSize: 13, fontWeight: 600, borderRadius: 8, border: '1px solid #A32D2D', background: '#fff', color: '#A32D2D', cursor: 'pointer' }}>Remove</button>
+                </div>
+              </div>
+            ) : (
+              <button onClick={() => coverRef.current?.click()} style={{ width: '100%', padding: '14px', fontSize: 13, fontWeight: 600, borderRadius: 8, border: `1.5px dashed ${FL_GREEN}`, background: '#fff', color: FL_GREEN, cursor: 'pointer' }}>📷 Add front-of-house photo</button>
+            )}
+            <input ref={coverRef} type="file" accept="image/*" capture="environment" onChange={handleCoverPhoto} style={{ display: 'none' }} />
+            <div style={{ fontSize: 11, color: '#AAA', marginTop: 6 }}>Appears at the top of the report. If left empty, your Front Elevation photo is used.</div>
+          </div>
+
           <button
             onClick={() => setSavedFlash(true)}
             style={{ width: '100%', padding: '11px', background: savedFlash ? '#1D9E75' : '#fff', color: savedFlash ? '#fff' : FL_GREEN, border: `1.5px solid ${savedFlash ? '#1D9E75' : FL_GREEN}`, borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer', marginBottom: 10 }}>
@@ -633,6 +661,8 @@ function App() {
   if (screen === 'report') {
     const doneSections = sections.filter(s => sectionData[s.key]);
     const hazards = sections.filter(s => sectionData[s.key]?.safetyHazard);
+    const frontElev = sectionData['front-elevation'];
+    const coverPhoto = reportInfo.coverPhoto || (frontElev && frontElev.photos && frontElev.photos[0]) || '';
     const detailFields = [
       ['companyName', 'Company name'],
       ['license', 'License #'],
@@ -685,6 +715,10 @@ function App() {
               {reportInfo.inspectionDate && <div><strong>Date:</strong> {reportInfo.inspectionDate}</div>}
             </div>
           </div>
+
+          {coverPhoto && (
+            <img src={coverPhoto} alt="Front of house" style={{ width: '100%', maxHeight: 340, objectFit: 'cover', borderRadius: 8, border: '1px solid #E0E0E0', display: 'block', marginBottom: 16 }} />
+          )}
 
           <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
             <div style={{ flex: 1, textAlign: 'center', padding: 10, background: '#F5F7F5', borderRadius: 8 }}>
