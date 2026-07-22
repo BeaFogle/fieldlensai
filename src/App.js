@@ -11,6 +11,8 @@ const NOT_INSPECTED_TEXT = 'This area was not inspected. The area was not access
 // database are added, so they sync across devices).
 const STATEMENTS_KEY = 'fieldlens_statements';
 const REPORT_KEY = 'fieldlens_report_info';
+const SECTIONDATA_KEY = 'fieldlens_section_data';
+const EXTRAROOMS_KEY = 'fieldlens_extra_rooms';
 
 // Sections that get a smoke-detector check (living spaces). Dynamically-added
 // bedrooms (bedroom-2, bedroom-3, ...) are matched by pattern below.
@@ -22,8 +24,16 @@ function isLivingSpace(key) {
 function App() {
   const [screen, setScreen] = useState('home');
   const [activeSection, setActiveSection] = useState(null);
-  const [sectionData, setSectionData] = useState({});
-  const [extraRooms, setExtraRooms] = useState([]);
+  const [sectionData, setSectionData] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(SECTIONDATA_KEY)) || {}; }
+    catch { return {}; }
+  });
+  const [extraRooms, setExtraRooms] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(EXTRAROOMS_KEY)) || []; }
+    catch { return []; }
+  });
+  const [viewPhoto, setViewPhoto] = useState(null);
+  const [savedFlash, setSavedFlash] = useState(false);
   const [statements, setStatements] = useState(() => {
     try { return JSON.parse(localStorage.getItem(STATEMENTS_KEY)) || []; }
     catch { return []; }
@@ -45,7 +55,30 @@ function App() {
     try { localStorage.setItem(REPORT_KEY, JSON.stringify(reportInfo)); } catch (e) {}
   }, [reportInfo]);
 
+  // Auto-save the whole inspection. Photos are large, so if the browser storage
+  // fills up we fall back to saving everything except photos, so text findings
+  // always survive a refresh. (Full photo storage comes with the accounts/DB phase.)
+  useEffect(() => {
+    try {
+      localStorage.setItem(SECTIONDATA_KEY, JSON.stringify(sectionData));
+    } catch (e) {
+      try {
+        const slim = {};
+        for (const k in sectionData) {
+          const { photos, photoSrc, ...rest } = sectionData[k];
+          slim[k] = rest;
+        }
+        localStorage.setItem(SECTIONDATA_KEY, JSON.stringify(slim));
+      } catch (e2) {}
+    }
+  }, [sectionData]);
+
+  useEffect(() => {
+    try { localStorage.setItem(EXTRAROOMS_KEY, JSON.stringify(extraRooms)); } catch (e) {}
+  }, [extraRooms]);
+
   function updateReportInfo(field, value) {
+    setSavedFlash(false);
     setReportInfo(prev => ({ ...prev, [field]: value }));
   }
 
@@ -475,6 +508,19 @@ function App() {
             />
           </div>
 
+          {/* Saved photos for this section — tap to view any time */}
+          {data.photos && data.photos.length > 0 && (
+            <div style={{ background: '#fff', borderRadius: 10, padding: '14px', marginBottom: 12 }}>
+              <div style={{ fontSize: 11, fontWeight: 500, color: '#888', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 8 }}>Saved Photos ({data.photos.length})</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {data.photos.map((p, i) => (
+                  <img key={i} src={p} alt="" onClick={() => setViewPhoto(p)} style={{ width: 92, height: 72, objectFit: 'cover', borderRadius: 6, border: '1px solid #E0E0E0', cursor: 'pointer' }} />
+                ))}
+              </div>
+              <div style={{ fontSize: 11, color: '#AAA', marginTop: 6 }}>Tap a photo to view it larger. The AI findings for these photos are saved in the notes above.</div>
+            </div>
+          )}
+
           {/* Safety hazard — inspector can override either way */}
           {data.safetyHazard ? (
             <div style={{ background: '#FCEBEB', border: '0.5px solid #E24B4A', borderRadius: 10, padding: '12px 14px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -504,6 +550,12 @@ function App() {
             Save & Return to Sections
           </button>
         </div>
+
+        {viewPhoto && (
+          <div onClick={() => setViewPhoto(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
+            <img src={viewPhoto} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+          </div>
+        )}
       </div>
     );
   }
@@ -543,7 +595,12 @@ function App() {
               style={{ width: '100%', fontSize: 13, padding: '9px', borderRadius: 6, border: '0.5px solid #ccc', marginBottom: 6, boxSizing: 'border-box', fontFamily: 'inherit' }}
             />
           ))}
-          <div style={{ fontSize: 11, color: '#AAA' }}>Company details save automatically. Tap "Save as PDF" to print or save the report.</div>
+          <button
+            onClick={() => setSavedFlash(true)}
+            style={{ width: '100%', padding: '11px', background: savedFlash ? '#1D9E75' : FL_GREEN, color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer', marginTop: 2 }}>
+            {savedFlash ? '✓ Saved' : 'Save Details'}
+          </button>
+          <div style={{ fontSize: 11, color: '#AAA', marginTop: 6 }}>Details also save automatically as you type. Tap "Save as PDF" above to print or share the report.</div>
         </div>
 
         {/* Printable report body */}
