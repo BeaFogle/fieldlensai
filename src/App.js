@@ -16,6 +16,22 @@ const EXTRAROOMS_KEY = 'fieldlens_extra_rooms';
 
 // Sections that get a smoke-detector check (living spaces). Dynamically-added
 // bedrooms (bedroom-2, bedroom-3, ...) are matched by pattern below.
+// Property facts recorded on the report, under the address.
+const PROPERTY_FIELDS = [
+  ['yearBuilt', 'Year built'],
+  ['squareFeet', 'Square footage'],
+  ['bedrooms', 'Bedrooms'],
+  ['bathrooms', 'Bathrooms'],
+  ['stories', 'Stories / levels'],
+  ['propertyType', 'Property type (single family, condo…)'],
+  ['foundationType', 'Foundation (slab, crawlspace…)'],
+  ['garage', 'Garage (e.g. 2-car attached)'],
+  ['poolSpa', 'Pool / spa (yes / no)'],
+  ['occupancy', 'Occupancy (occupied / vacant / furnished)'],
+  ['utilitiesOn', 'Utilities on at inspection'],
+  ['weather', 'Weather & temperature'],
+];
+
 // Finding flags an inspector can toggle on any section.
 const FLAG_TYPES = [
   { key: 'safetyHazard', label: 'Safety Hazard', icon: '⚠', color: '#A32D2D', bg: '#FCEBEB' },
@@ -383,6 +399,21 @@ function App() {
           ))}
 
           <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 6 }}>Property Details</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {PROPERTY_FIELDS.map(([f, label]) => (
+                <input
+                  key={f}
+                  value={reportInfo[f] || ''}
+                  onChange={e => updateReportInfo(f, e.target.value)}
+                  placeholder={label}
+                  style={{ flex: '1 1 45%', minWidth: 140, fontSize: 14, padding: '11px', borderRadius: 8, border: '0.5px solid #ccc', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 6 }}>Present During Inspection</div>
             {attendees.map((name, i) => (
               <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
@@ -705,6 +736,9 @@ function App() {
     const doneSections = sections.filter(s => sectionData[s.key]);
     const hazards = sections.filter(s => sectionData[s.key]?.safetyHazard);
     const attendeeList = (reportInfo.attendees || []).filter(a => a && a.trim());
+    const propertyDetails = PROPERTY_FIELDS
+      .filter(([f]) => reportInfo[f] && String(reportInfo[f]).trim())
+      .map(([f, label]) => [label.replace(/\s*\(.*\)\s*$/, ''), reportInfo[f]]);
     const frontElev = sectionData['front-elevation'];
     const coverPhoto = reportInfo.coverPhoto || (frontElev && frontElev.photos && frontElev.photos[0]) || '';
     const detailFields = [
@@ -763,6 +797,17 @@ function App() {
 
           {coverPhoto && (
             <img src={coverPhoto} alt="Front of house" style={{ width: '100%', maxHeight: 340, objectFit: 'cover', borderRadius: 8, border: '1px solid #E0E0E0', display: 'block', marginBottom: 16 }} />
+          )}
+
+          {propertyDetails.length > 0 && (
+            <div style={{ marginBottom: 18, padding: '10px 12px', background: '#F5F7F5', borderRadius: 8 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 6 }}>Property Details</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 20px' }}>
+                {propertyDetails.map(([label, val]) => (
+                  <div key={label} style={{ fontSize: 12, color: '#333' }}><strong>{label}:</strong> {val}</div>
+                ))}
+              </div>
+            </div>
           )}
 
           <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
