@@ -282,7 +282,7 @@ function App() {
         {/* Start button */}
         <div style={{ padding: '16px 16px 8px' }}>
           <button
-            onClick={() => setScreen('sections')}
+            onClick={() => setScreen('intake')}
             style={{ width: '100%', padding: '16px', background: FL_GREEN, color: '#fff', border: 'none', borderRadius: 12, fontSize: 16, fontWeight: 600, cursor: 'pointer' }}>
             Start New Inspection →
           </button>
@@ -297,11 +297,75 @@ function App() {
           </button>
         </div>
 
-        {/* Section list preview */}
+        {/* Continue inspection */}
         <div style={{ padding: '0 16px 32px' }}>
-          <div style={{ fontSize: 12, fontWeight: 500, color: '#888', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 10 }}>
-            Inspection sections
+          <button
+            onClick={() => setScreen('sections')}
+            style={{ width: '100%', padding: '14px', background: '#fff', color: FL_GREEN, border: `1.5px solid ${FL_GREEN}`, borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>
+            Continue Inspection ({completedCount}/{sections.length}) →
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── NEW INSPECTION / DETAILS INTAKE ──────────────────────
+  if (screen === 'intake') {
+    const detailFields = [
+      ['companyName', 'Company name'],
+      ['license', 'License #'],
+      ['inspectorName', 'Inspector name'],
+      ['clientName', 'Client name'],
+      ['propertyAddress', 'Property address'],
+      ['inspectionDate', 'Inspection date (mm/dd/yyyy)'],
+    ];
+    return (
+      <div style={{ minHeight: '100vh', background: '#F5F7F5', fontFamily: 'system-ui, sans-serif' }}>
+        <div style={{ background: FL_GREEN, padding: '14px 16px', color: '#fff', display: 'flex', alignItems: 'center', gap: 12, position: 'sticky', top: 0, zIndex: 10 }}>
+          <button onClick={() => setScreen('home')} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 20, cursor: 'pointer' }}>←</button>
+          <div style={{ flex: 1, fontWeight: 600 }}>New Inspection</div>
+          <button onClick={() => setScreen('report')} style={{ padding: '7px 12px', background: '#fff', color: FL_GREEN, border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>📄 PDF Report</button>
+        </div>
+        <div style={{ padding: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 8 }}>Claim / Inspection Details</div>
+          {detailFields.map(([f, label]) => (
+            <input
+              key={f}
+              value={reportInfo[f] || ''}
+              onChange={e => updateReportInfo(f, e.target.value)}
+              placeholder={label}
+              style={{ width: '100%', fontSize: 14, padding: '11px', borderRadius: 8, border: '0.5px solid #ccc', marginBottom: 8, boxSizing: 'border-box', fontFamily: 'inherit' }}
+            />
+          ))}
+          <button
+            onClick={() => setSavedFlash(true)}
+            style={{ width: '100%', padding: '11px', background: savedFlash ? '#1D9E75' : '#fff', color: savedFlash ? '#fff' : FL_GREEN, border: `1.5px solid ${savedFlash ? '#1D9E75' : FL_GREEN}`, borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer', marginBottom: 10 }}>
+            {savedFlash ? '✓ Saved' : 'Save Details'}
+          </button>
+          <button
+            onClick={() => setScreen('sections')}
+            style={{ width: '100%', padding: '15px', background: FL_GREEN, color: '#fff', border: 'none', borderRadius: 12, fontSize: 16, fontWeight: 600, cursor: 'pointer' }}>
+            Start Inspection →
+          </button>
+          <div style={{ fontSize: 11, color: '#AAA', marginTop: 8 }}>Details save automatically as you type. You can print the PDF report at any time from the button up top.</div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── SECTIONS LIST ────────────────────────────────────────
+  if (screen === 'sections') {
+    return (
+      <div style={{ minHeight: '100vh', background: '#F5F7F5', fontFamily: 'system-ui, sans-serif' }}>
+        <div style={{ background: FL_GREEN, padding: '14px 16px', color: '#fff', display: 'flex', alignItems: 'center', gap: 12, position: 'sticky', top: 0, zIndex: 10 }}>
+          <button onClick={() => setScreen('home')} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 20, cursor: 'pointer' }}>←</button>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 15, fontWeight: 600 }}>Inspection Sections</div>
+            {reportInfo.propertyAddress && <div style={{ fontSize: 11, opacity: .8 }}>{reportInfo.propertyAddress}</div>}
           </div>
+          <button onClick={() => setScreen('report')} style={{ padding: '7px 12px', background: '#fff', color: FL_GREEN, border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>📄 PDF Report</button>
+        </div>
+        <div style={{ padding: '16px' }}>
           {sections.map(s => {
             const done = sectionData[s.key];
             return (
@@ -328,9 +392,7 @@ function App() {
               </div>
             );
           })}
-
-          {/* Add-as-needed rooms */}
-          <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+          <div style={{ display: 'flex', gap: 8, marginTop: 4, marginBottom: 24 }}>
             <button onClick={() => addRoom('bathroom')} style={{ flex: 1, padding: '12px', background: '#fff', border: `1px dashed ${FL_GREEN}`, borderRadius: 10, color: FL_GREEN, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>＋ Add Bathroom</button>
             <button onClick={() => addRoom('bedroom')} style={{ flex: 1, padding: '12px', background: '#fff', border: `1px dashed ${FL_GREEN}`, borderRadius: 10, color: FL_GREEN, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>＋ Add Bedroom</button>
           </div>
@@ -361,7 +423,7 @@ function App() {
         
         {/* Header */}
         <div style={{ background: FL_GREEN, padding: '16px', color: '#fff', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={() => setScreen('home')} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 20, cursor: 'pointer' }}>←</button>
+          <button onClick={() => setScreen('sections')} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 20, cursor: 'pointer' }}>←</button>
           <div>
             <div style={{ fontSize: 11, opacity: .7 }}>SECTION</div>
             <div style={{ fontSize: 16, fontWeight: 600 }}>{activeSection.label}</div>
@@ -545,7 +607,7 @@ function App() {
 
           {/* Save button */}
           <button
-            onClick={() => setScreen('home')}
+            onClick={() => setScreen('sections')}
             style={{ width: '100%', padding: '14px', background: FL_GREEN, color: '#fff', border: 'none', borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>
             Save & Return to Sections
           </button>
