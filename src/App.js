@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import PhotoAnalysisButton, { resizeImageForUpload } from './components/PhotoAnalysisButton';
+import { savePhotos, loadPhotos } from './photoStore';
 
 const FL_GREEN = '#0F6E56';
 const FL_GOLD = '#BA7517';
@@ -32,12 +33,12 @@ const PROPERTY_FIELDS = [
   ['weather', 'Weather & temperature'],
 ];
 
-// Finding flags an inspector can toggle on any section.
+// Finding categories. Each finding = one of these flags + a short issue note.
 const FLAG_TYPES = [
-  { key: 'safetyHazard', label: 'Safety Hazard', icon: '⚠', color: '#A32D2D', bg: '#FCEBEB' },
-  { key: 'maintenance', label: 'Maintenance Needed', icon: '🔧', color: '#BA7517', bg: '#FAEEDA' },
-  { key: 'cosmetic', label: 'Cosmetic', icon: '🎨', color: '#185FA5', bg: '#E6F1FB' },
-  { key: 'recommendation', label: 'Recommendation', icon: '💡', color: '#0F6E56', bg: '#E1F5EE' },
+  { key: 'safetyHazard', label: 'Safety Hazard', color: '#C0392B', bg: '#FCEBEB' },
+  { key: 'maintenance', label: 'Maintenance Needed', color: '#185FA5', bg: '#E6F1FB' },
+  { key: 'cosmetic', label: 'Cosmetic', color: '#0E7C86', bg: '#E0F3F4' },
+  { key: 'recommendation', label: 'Recommendation', color: '#BA7517', bg: '#FAEEDA' },
 ];
 
 const LIVING_SPACE_KEYS = ['master-bedroom', 'living-room', 'family-room', 'game-room', 'dining-room', 'office', 'hallways'];
@@ -59,6 +60,7 @@ function App() {
   const [viewPhoto, setViewPhoto] = useState(null);
   const [savedFlash, setSavedFlash] = useState(false);
   const coverRef = useRef(null);
+  const [newFinding, setNewFinding] = useState({ flag: 'maintenance', text: '' });
   const [statements, setStatements] = useState(() => {
     try { return JSON.parse(localStorage.getItem(STATEMENTS_KEY)) || []; }
     catch { return []; }
@@ -83,20 +85,44 @@ function App() {
   // Auto-save the whole inspection. Photos are large, so if the browser storage
   // fills up we fall back to saving everything except photos, so text findings
   // always survive a refresh. (Full photo storage comes with the accounts/DB phase.)
+  // Text findings -> localStorage (small). Photos are stripped out here and
+  // stored separately in IndexedDB, which has far more room.
   useEffect(() => {
     try {
-      localStorage.setItem(SECTIONDATA_KEY, JSON.stringify(sectionData));
-    } catch (e) {
-      try {
-        const slim = {};
-        for (const k in sectionData) {
-          const { photos, photoSrc, ...rest } = sectionData[k];
-          slim[k] = rest;
-        }
-        localStorage.setItem(SECTIONDATA_KEY, JSON.stringify(slim));
-      } catch (e2) {}
-    }
+      const slim = {};
+      for (const k in sectionData) {
+        const { photos, photoSrc, ...rest } = sectionData[k];
+        slim[k] = rest;
+      }
+      localStorage.setItem(SECTIONDATA_KEY, JSON.stringify(slim));
+    } catch (e) {}
   }, [sectionData]);
+
+  // Photos -> IndexedDB so they persist across refreshes and app restarts.
+  useEffect(() => {
+    const map = {};
+    for (const k in sectionData) {
+      const p = sectionData[k].photos;
+      if (p && p.length) map[k] = p;
+    }
+    savePhotos(map).catch(() => {});
+  }, [sectionData]);
+
+  // On first load, pull saved photos back in and merge them into the sections.
+  useEffect(() => {
+    let cancelled = false;
+    loadPhotos().then(map => {
+      if (cancelled || !map) return;
+      setSectionData(prev => {
+        const next = { ...prev };
+        for (const k in map) {
+          next[k] = { ...(next[k] || {}), photos: map[k], photoSrc: map[k][map[k].length - 1] };
+        }
+        return next;
+      });
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     try { localStorage.setItem(EXTRAROOMS_KEY, JSON.stringify(extraRooms)); } catch (e) {}
@@ -260,9 +286,31 @@ function App() {
     setSectionData(prev => ({ ...prev, [activeSection.key]: { ...prev[activeSection.key], [field]: value } }));
   }
 
+  function addFinding(flag, text) {
+    const t = (text || '').trim();
+    if (!t) return;
+    setSectionData(prev => {
+      const cur = prev[activeSection.key] || {};
+      const findings = [...(cur.findings || []), { id: 'f-' + Date.now(), flag, text: t }];
+      return { ...prev, [activeSection.key]: { ...cur, findings } };
+    });
+  }
+
+  function removeFinding(id) {
+    setSectionData(prev => {
+      const cur = prev[activeSection.key] || {};
+      return { ...prev, [activeSection.key]: { ...cur, findings: (cur.findings || []).filter(f => f.id !== id) } };
+    });
+  }
+
   function setSmokeDetector(value) {
     const danger = value === 'Present – Not Working' || value === 'Missing';
-    setSectionData(prev => ({ ...prev, [activeSection.key]: { ...prev[activeSection.key], smokeDetector: value, safetyHazard: danger } }));
+    setSectionData(prev => {
+      const cur = prev[activeSection.key] || {};
+      let findings = (cur.findings || []).filter(f => f.id !== 'smoke-auto');
+      if (danger) findings = [...findings, { id: 'smoke-auto', flag: 'safetyHazard', text: `Smoke detector – ${value}` }];
+      return { ...prev, [activeSection.key]: { ...cur, smokeDetector: value, findings } };
+    });
   }
 
   function handleAIResult(sectionKey, result) {
@@ -274,6 +322,10 @@ function App() {
         ? result.conditionRating
         : cur.conditionRating;
       const existingNotes = (cur.notes || '').trim();
+      const findings = cur.findings || [];
+      const withAiSafety = (result.safetyHazard && !findings.some(f => f.id === 'ai-safety'))
+        ? [...findings, { id: 'ai-safety', flag: 'safetyHazard', text: 'AI-flagged potential safety hazard — see notes' }]
+        : findings;
       return {
         ...prev,
         [sectionKey]: {
@@ -282,8 +334,8 @@ function App() {
           // Stack each photo's finding so nothing is lost across multiple photos.
           notes: existingNotes ? existingNotes + '\n\n' + result.deficiencyWriteUp : result.deficiencyWriteUp,
           recommendedAction: result.recommendedAction,
-          // Once any photo flags a hazard, the section stays flagged.
           safetyHazard: cur.safetyHazard || result.safetyHazard,
+          findings: withAiSafety,
           photoSrc: result.photoSrc,
           photos: [...(cur.photos || []), result.photoSrc],
           aiAnalyzed: true,
@@ -293,7 +345,7 @@ function App() {
   }
 
   const completedCount = Object.keys(sectionData).length;
-  const hazardCount = Object.values(sectionData).filter(s => s.safetyHazard).length;
+  const hazardCount = Object.values(sectionData).filter(s => (s.findings || []).some(f => f.flag === 'safetyHazard')).length;
 
   // ── HOME SCREEN ──────────────────────────────────────────
   if (screen === 'home') {
@@ -482,12 +534,12 @@ function App() {
               <div
                 key={s.key}
                 onClick={() => { setActiveSection(s); setScreen('section'); }}
-                style={{ background: '#fff', border: `0.5px solid ${done?.safetyHazard ? '#E24B4A' : done ? '#1D9E75' : '#E0E0E0'}`, borderRadius: 10, padding: '12px 14px', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                style={{ background: '#fff', border: `0.5px solid ${(done?.findings || []).some(f => f.flag === 'safetyHazard') ? '#E24B4A' : done ? '#1D9E75' : '#E0E0E0'}`, borderRadius: 10, padding: '12px 14px', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
                 <span style={{ fontSize: 20 }}>{s.icon}</span>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 14, fontWeight: 500, color: '#1A1A1A' }}>{s.label}</div>
-                  {done && <div style={{ fontSize: 12, color: done.safetyHazard ? '#E24B4A' : FL_GREEN }}>
-                    {done.conditionRating} · {done.safetyHazard ? '⚠ Safety hazard' : '✓ No hazard'}
+                  {done && <div style={{ fontSize: 12, color: (done.findings || []).some(f => f.flag === 'safetyHazard') ? '#E24B4A' : FL_GREEN }}>
+                    {done.conditionRating || 'In progress'}{(done.findings && done.findings.length) ? ` · ${done.findings.length} finding${done.findings.length > 1 ? 's' : ''}` : ''}
                   </div>}
                   {!done && <div style={{ fontSize: 12, color: '#AAA' }}>Tap to inspect</div>}
                 </div>
@@ -693,25 +745,48 @@ function App() {
             </div>
           )}
 
-          {/* Finding flags — tap to toggle; inspector always has final say */}
+          {/* Findings — flag + short issue; these build the report's summary list */}
           <div style={{ background: '#fff', borderRadius: 10, padding: '14px', marginBottom: 12 }}>
-            <div style={{ fontSize: 11, fontWeight: 500, color: '#888', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 8 }}>Flags</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {FLAG_TYPES.map(fl => {
-                const on = !!data[fl.key];
-                return (
-                  <button
-                    key={fl.key}
-                    onClick={() => setSectionField(fl.key, !on)}
-                    style={{ flex: '1 1 45%', padding: '9px 6px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: `0.5px solid ${on ? fl.color : '#E0E0E0'}`, background: on ? fl.bg : '#fff', color: on ? fl.color : '#888', cursor: 'pointer' }}>
-                    {fl.icon} {fl.label}
-                  </button>
-                );
-              })}
-            </div>
-            {data.safetyHazard && (
-              <div style={{ marginTop: 8, fontSize: 12, color: '#A32D2D', fontWeight: 600 }}>⚠ Safety hazard — highlighted red in the report. Tap again to remove.</div>
+            <div style={{ fontSize: 11, fontWeight: 500, color: '#888', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 8 }}>Findings</div>
+
+            {(data.findings || []).map(f => {
+              const meta = FLAG_TYPES.find(t => t.key === f.flag) || {};
+              return (
+                <div key={f.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 6 }}>
+                  <span style={{ width: 16, height: 16, borderRadius: 4, background: meta.color, flexShrink: 0, marginTop: 2 }} />
+                  <div style={{ flex: 1, fontSize: 13, color: '#222' }}><strong style={{ color: meta.color }}>{meta.label}:</strong> {f.text}</div>
+                  <button onClick={() => removeFinding(f.id)} title="Remove finding" style={{ background: 'none', border: 'none', color: '#A32D2D', fontSize: 15, cursor: 'pointer', lineHeight: 1 }}>✕</button>
+                </div>
+              );
+            })}
+            {(!data.findings || data.findings.length === 0) && (
+              <div style={{ fontSize: 12, color: '#AAA', marginBottom: 8 }}>No findings yet. Pick a flag and describe the issue below — it will appear in the report summary.</div>
             )}
+
+            <div style={{ marginTop: 6, paddingTop: 10, borderTop: '0.5px solid #eee' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
+                {FLAG_TYPES.map(fl => {
+                  const sel = newFinding.flag === fl.key;
+                  return (
+                    <button key={fl.key} onClick={() => setNewFinding(n => ({ ...n, flag: fl.key }))}
+                      style={{ flex: '1 1 45%', padding: '7px 6px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: `0.5px solid ${sel ? fl.color : '#E0E0E0'}`, background: sel ? fl.bg : '#fff', color: sel ? fl.color : '#888', cursor: 'pointer' }}>
+                      <span style={{ display: 'inline-block', width: 11, height: 11, borderRadius: 3, background: fl.color, marginRight: 6, verticalAlign: 'middle' }} />{fl.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <input
+                  value={newFinding.text}
+                  onChange={e => setNewFinding(n => ({ ...n, text: e.target.value }))}
+                  placeholder="Describe the issue (e.g. Air handler: moisture in unit)"
+                  style={{ flex: 1, fontSize: 13, padding: '9px', borderRadius: 6, border: '0.5px solid #ccc', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                />
+                <button
+                  onClick={() => { addFinding(newFinding.flag, newFinding.text); setNewFinding(n => ({ ...n, text: '' })); }}
+                  style={{ padding: '9px 16px', fontSize: 13, fontWeight: 600, borderRadius: 6, border: 'none', background: FL_GREEN, color: '#fff', cursor: 'pointer' }}>Add</button>
+              </div>
+            </div>
           </div>
 
           {/* Save button */}
@@ -723,8 +798,17 @@ function App() {
         </div>
 
         {viewPhoto && (
-          <div onClick={() => setViewPhoto(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
-            <img src={viewPhoto} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+          <div onClick={() => setViewPhoto(null)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.92)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
+            <button
+              onClick={(e) => { e.stopPropagation(); setViewPhoto(null); }}
+              title="Close"
+              style={{ position: 'absolute', top: 12, right: 12, width: 46, height: 46, borderRadius: 23, border: 'none', background: '#fff', color: '#222', fontSize: 22, fontWeight: 700, cursor: 'pointer', lineHeight: 1 }}>✕</button>
+            <img src={viewPhoto} alt="" style={{ maxWidth: '100%', maxHeight: '80%', objectFit: 'contain' }} />
+            <button
+              onClick={(e) => { e.stopPropagation(); setViewPhoto(null); }}
+              style={{ marginTop: 16, padding: '13px 24px', borderRadius: 10, border: 'none', background: FL_GREEN, color: '#fff', fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>
+              ← Back to inspection
+            </button>
           </div>
         )}
       </div>
@@ -734,7 +818,6 @@ function App() {
   // ── REPORT SCREEN ────────────────────────────────────────
   if (screen === 'report') {
     const doneSections = sections.filter(s => sectionData[s.key]);
-    const hazards = sections.filter(s => sectionData[s.key]?.safetyHazard);
     const attendeeList = (reportInfo.attendees || []).filter(a => a && a.trim());
     const propertyDetails = PROPERTY_FIELDS
       .filter(([f]) => reportInfo[f] && String(reportInfo[f]).trim())
@@ -810,34 +893,46 @@ function App() {
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
-            <div style={{ flex: 1, textAlign: 'center', padding: 10, background: '#F5F7F5', borderRadius: 8 }}>
-              <div style={{ fontSize: 20, fontWeight: 700, color: FL_GREEN }}>{doneSections.length}</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 20 }}>
+            <div style={{ flex: '1 1 30%', minWidth: 92, textAlign: 'center', padding: '12px 8px', background: '#F5F7F5', borderRadius: 6 }}>
+              <div style={{ fontSize: 22, fontWeight: 700, color: FL_GREEN }}>{doneSections.length}</div>
               <div style={{ fontSize: 11, color: '#888' }}>Sections inspected</div>
             </div>
-            <div style={{ flex: 1, textAlign: 'center', padding: 10, background: '#F5F7F5', borderRadius: 8 }}>
-              <div style={{ fontSize: 20, fontWeight: 700, color: hazards.length ? '#E24B4A' : FL_GREEN }}>{hazards.length}</div>
-              <div style={{ fontSize: 11, color: '#888' }}>Safety hazards</div>
-            </div>
+            {FLAG_TYPES.map(fl => {
+              const count = sections.reduce((n, s) => n + (sectionData[s.key]?.findings || []).filter(f => f.flag === fl.key).length, 0);
+              return (
+                <div key={fl.key} style={{ flex: '1 1 30%', minWidth: 92, textAlign: 'center', padding: '12px 8px', background: fl.bg, borderRadius: 6 }}>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: fl.color }}>{count}</div>
+                  <div style={{ fontSize: 11, color: fl.color, fontWeight: 600 }}>{fl.label}</div>
+                </div>
+              );
+            })}
           </div>
 
-          {FLAG_TYPES.some(fl => sections.some(s => sectionData[s.key]?.[fl.key])) && (
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#1A1A1A', marginBottom: 8 }}>Findings Summary</div>
-              {FLAG_TYPES.map(fl => {
-                const list = sections.filter(s => sectionData[s.key]?.[fl.key]);
-                if (list.length === 0) return null;
-                return (
-                  <div key={fl.key} style={{ marginBottom: 10, breakInside: 'avoid' }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: fl.color, marginBottom: 3 }}>{fl.icon} {fl.label} ({list.length})</div>
-                    {list.map(s => (
-                      <div key={s.key} style={{ fontSize: 13, color: fl.color }}>• {s.label}</div>
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          {(() => {
+            const all = [];
+            sections.forEach(s => (sectionData[s.key]?.findings || []).forEach(f => all.push({ ...f, section: s.label })));
+            if (all.length === 0) return null;
+            return (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#1A1A1A', marginBottom: 8 }}>Findings Summary</div>
+                {FLAG_TYPES.map(fl => {
+                  const list = all.filter(f => f.flag === fl.key);
+                  if (list.length === 0) return null;
+                  return (
+                    <div key={fl.key} style={{ marginBottom: 12, breakInside: 'avoid' }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: fl.color, marginBottom: 4, display: 'flex', alignItems: 'center' }}>
+                        <span style={{ display: 'inline-block', width: 13, height: 13, borderRadius: 3, background: fl.color, marginRight: 6 }} />{fl.label} ({list.length})
+                      </div>
+                      {list.map((f, i) => (
+                        <div key={i} style={{ fontSize: 13, color: '#333', marginLeft: 19, marginBottom: 2 }}>• <strong>{f.section}:</strong> {f.text}</div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
 
           {doneSections.length === 0 && (
             <div style={{ color: '#888', fontSize: 14 }}>No sections inspected yet. Go back, complete some sections, then return here to generate the report.</div>
@@ -850,12 +945,25 @@ function App() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E0E0E0', paddingBottom: 4, marginBottom: 6 }}>
                   <div style={{ fontSize: 15, fontWeight: 700, color: '#1A1A1A' }}>{s.icon} {s.label}</div>
                   <div style={{ display: 'flex', gap: 6 }}>
-                    {d.conditionRating && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10, background: '#F5F7F5', color: '#333' }}>{d.conditionRating}</span>}
-                    {FLAG_TYPES.filter(fl => d[fl.key]).map(fl => (
-                      <span key={fl.key} style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10, background: fl.bg, color: fl.color }}>{fl.icon} {fl.label}</span>
+                    {d.conditionRating && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: '#F5F7F5', color: '#333' }}>{d.conditionRating}</span>}
+                    {FLAG_TYPES.filter(fl => (d.findings || []).some(f => f.flag === fl.key)).map(fl => (
+                      <span key={fl.key} style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: fl.bg, color: fl.color }}>{fl.label}</span>
                     ))}
                   </div>
                 </div>
+                {(d.findings && d.findings.length > 0) && (
+                  <div style={{ marginBottom: 6 }}>
+                    {d.findings.map(f => {
+                      const meta = FLAG_TYPES.find(t => t.key === f.flag) || {};
+                      return (
+                        <div key={f.id} style={{ fontSize: 13, color: '#333', marginBottom: 2 }}>
+                          <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: meta.color, marginRight: 6 }} />
+                          <strong style={{ color: meta.color }}>{meta.label}:</strong> {f.text}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
                 {(d.returnTemp || d.supplyTemp) && (
                   <div style={{ fontSize: 12, color: '#555', marginBottom: 4 }}>
                     Return: {d.returnTemp || '—'}°F · Supply: {d.supplyTemp || '—'}°F{d.returnTemp && d.supplyTemp ? ` · Differential ${Math.round((parseFloat(d.returnTemp) - parseFloat(d.supplyTemp)) * 10) / 10}°F` : ''}
