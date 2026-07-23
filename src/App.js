@@ -61,6 +61,7 @@ function App() {
   const [savedFlash, setSavedFlash] = useState(false);
   const coverRef = useRef(null);
   const [newFinding, setNewFinding] = useState({ flag: 'maintenance', text: '' });
+  const photosHydrated = useRef(false);
   const [statements, setStatements] = useState(() => {
     try { return JSON.parse(localStorage.getItem(STATEMENTS_KEY)) || []; }
     catch { return []; }
@@ -98,8 +99,11 @@ function App() {
     } catch (e) {}
   }, [sectionData]);
 
-  // Photos -> IndexedDB so they persist across refreshes and app restarts.
+  // Photos -> IndexedDB. IMPORTANT: don't save until AFTER the initial load has
+  // restored saved photos, otherwise the first (empty) render would overwrite
+  // and wipe them before they're read back.
   useEffect(() => {
+    if (!photosHydrated.current) return;
     const map = {};
     for (const k in sectionData) {
       const p = sectionData[k].photos;
@@ -112,15 +116,18 @@ function App() {
   useEffect(() => {
     let cancelled = false;
     loadPhotos().then(map => {
-      if (cancelled || !map) return;
-      setSectionData(prev => {
-        const next = { ...prev };
-        for (const k in map) {
-          next[k] = { ...(next[k] || {}), photos: map[k], photoSrc: map[k][map[k].length - 1] };
-        }
-        return next;
-      });
-    }).catch(() => {});
+      if (cancelled) { photosHydrated.current = true; return; }
+      if (map && Object.keys(map).length) {
+        setSectionData(prev => {
+          const next = { ...prev };
+          for (const k in map) {
+            next[k] = { ...(next[k] || {}), photos: map[k], photoSrc: map[k][map[k].length - 1] };
+          }
+          return next;
+        });
+      }
+      photosHydrated.current = true;
+    }).catch(() => { photosHydrated.current = true; });
     return () => { cancelled = true; };
   }, []);
 
