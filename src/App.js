@@ -232,6 +232,7 @@ function App() {
     { key: 'office', label: 'Office', icon: '💼' },
     { key: 'hallways', label: 'Hallways', icon: '🚪' },
     { key: 'hallway-closets', label: 'Hallway Closets', icon: '🧥' },
+    { key: 'stairs', label: 'Stairs / Stairways', icon: '🪜' },
     { key: 'master-bathroom', label: 'Master Bathroom', icon: '🛁' },
     { key: 'powder-room', label: 'Powder Room', icon: '🚽' },
     { key: 'master-bedroom', label: 'Master Bedroom', icon: '🛏️' },
@@ -847,7 +848,7 @@ function App() {
         <div className="no-print" style={{ position: 'sticky', top: 0, background: FL_GREEN, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, zIndex: 10 }}>
           <button onClick={() => setScreen('home')} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 20, cursor: 'pointer' }}>←</button>
           <div style={{ flex: 1, color: '#fff', fontWeight: 600 }}>Inspection Report</div>
-          <button onClick={() => window.print()} style={{ padding: '8px 14px', background: '#fff', color: FL_GREEN, border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>Save as PDF</button>
+          <button onClick={() => window.print()} style={{ padding: '8px 14px', background: '#fff', color: FL_GREEN, border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>Print / Save PDF</button>
         </div>
 
         {/* Report details form */}
@@ -867,7 +868,7 @@ function App() {
             style={{ width: '100%', padding: '11px', background: savedFlash ? '#1D9E75' : FL_GREEN, color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer', marginTop: 2 }}>
             {savedFlash ? '✓ Saved' : 'Save Details'}
           </button>
-          <div style={{ fontSize: 11, color: '#AAA', marginTop: 6 }}>Details also save automatically as you type. Tap "Save as PDF" above to print or share the report.</div>
+          <div style={{ fontSize: 11, color: '#AAA', marginTop: 6 }}>Details also save automatically as you type. To make a PDF, tap "Print / Save PDF" above, then in the print window set the Destination to "Save as PDF" and click Save.</div>
         </div>
 
         {/* Printable report body */}
@@ -883,22 +884,19 @@ function App() {
               {reportInfo.inspectionDate && <div><strong>Date:</strong> {reportInfo.inspectionDate}</div>}
               {attendeeList.length > 0 && <div><strong>Present at inspection:</strong> {attendeeList.join('; ')}</div>}
             </div>
+            {propertyDetails.length > 0 && (
+              <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: '3px 18px' }}>
+                {propertyDetails.map(([label, val]) => (
+                  <div key={label} style={{ fontSize: 12, color: '#222' }}><strong>{label}:</strong> {val}</div>
+                ))}
+              </div>
+            )}
           </div>
 
           {coverPhoto && (
             <img src={coverPhoto} alt="Front of house" style={{ width: '100%', maxHeight: 340, objectFit: 'cover', borderRadius: 8, border: '1px solid #E0E0E0', display: 'block', marginBottom: 16 }} />
           )}
 
-          {propertyDetails.length > 0 && (
-            <div style={{ marginBottom: 18, padding: '10px 12px', background: '#F5F7F5', borderRadius: 8 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 6 }}>Property Details</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 20px' }}>
-                {propertyDetails.map(([label, val]) => (
-                  <div key={label} style={{ fontSize: 12, color: '#333' }}><strong>{label}:</strong> {val}</div>
-                ))}
-              </div>
-            </div>
-          )}
 
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 20 }}>
             <div style={{ flex: '1 1 30%', minWidth: 92, textAlign: 'center', padding: '12px 8px', background: '#F5F7F5', borderRadius: 6 }}>

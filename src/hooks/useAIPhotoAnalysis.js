@@ -57,6 +57,7 @@ const SECTION_CONTEXT = {
   'office':           { label: 'Office', forms: ['Home Inspection'], focus: 'the office: walls, ceiling, floor, windows, outlets, and any visible defects.' },
   'hallways':         { label: 'Hallways', forms: ['Home Inspection'], focus: 'hallways: walls, ceiling, floor, and the presence/condition of smoke detectors.' },
   'hallway-closets':  { label: 'Hallway Closets', forms: ['Home Inspection'], focus: 'hallway closets: walls, shelving, floor, and any visible defects.' },
+  'stairs':           { label: 'Stairs / Stairways', forms: ['Home Inspection'], focus: 'the stairs/stairways: treads and risers, handrails and guardrails (height, graspability, and baluster spacing), landings, headroom, lighting, and any trip hazards, loose components, or damage.' },
   'master-bathroom':  { label: 'Master Bathroom', forms: ['Home Inspection'], focus: 'the master bathroom: sink/toilet/tub/shower fixtures, plumbing, exhaust ventilation, GFCI outlets, and moisture/mold.' },
   'powder-room':      { label: 'Powder Room', forms: ['Home Inspection'], focus: 'the powder room: sink, toilet, plumbing, ventilation, and outlets.' },
   'master-bedroom':   { label: 'Master Bedroom', forms: ['Home Inspection'], focus: 'the master bedroom and its closet: walls, ceiling, floor, windows, outlets, and smoke detector.' },
